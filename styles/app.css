@@ -212,35 +212,38 @@ input[type="range"] {
 
 /* ---------- 呼吸ガイド ---------- */
 
-.breath-stage {
-  position: relative;
-  display: grid; place-items: center;
-  height: min(58vw, 300px); margin: 6px 0 18px;
+.breath-stage { margin: 2px 0 4px; }
+
+.breath-graph { display: block; width: 100%; height: auto; overflow: visible; }
+
+.bg-guide { stroke: var(--line); stroke-width: 1; stroke-dasharray: 3 4; }
+.bg-axis  { stroke: var(--line); stroke-width: 1; }
+.bg-now   { stroke: var(--text-3); stroke-width: 1; stroke-dasharray: 2 3; }
+.bg-tick  { fill: var(--text-3); font-size: 9.5px; font-family: var(--font-num); }
+
+.bg-past   { fill: none; stroke: var(--line-strong); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.bg-future { fill: none; stroke: var(--series-1); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.bg-fill   { fill: var(--series-1); opacity: .10; }
+
+.bg-dot  { fill: var(--series-1); }
+.bg-halo { fill: var(--series-1); opacity: .13; }
+
+.bg-marker line { stroke: var(--line-strong); stroke-width: 1; }
+.bg-mark-text { fill: var(--text-2); font-size: 10px; font-family: var(--font-num); }
+
+.breath-readout {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 14px; margin: 14px 0 16px;
 }
-.breath-halo {
-  position: absolute; width: min(52vw, 268px); aspect-ratio: 1; border-radius: 50%;
-  background: radial-gradient(circle, color-mix(in srgb, var(--series-1) 22%, transparent) 0%, transparent 68%);
-  transform: scale(var(--s, .6));
-  transition: transform .12s linear;
-}
-.breath-ring {
-  position: absolute; width: min(40vw, 208px); aspect-ratio: 1; border-radius: 50%;
-  border: 1px solid color-mix(in srgb, var(--series-1) 42%, transparent);
-  background: color-mix(in srgb, var(--series-1) 9%, transparent);
-  transform: scale(var(--s, .6));
-  transition: transform .12s linear;
-}
-.breath-copy { position: relative; text-align: center; z-index: 1; }
-.breath-phase { font-size: 20px; font-weight: 600; letter-spacing: .06em; }
+.breath-phase { font-size: 18px; font-weight: 600; letter-spacing: .04em; }
+.breath-meta { font-size: 12.5px; color: var(--text-3); margin-top: 2px; }
 .breath-count {
   font-family: var(--font-num);
-  font-size: 46px; font-weight: 300; line-height: 1.1;
+  font-size: 40px; font-weight: 300; line-height: 1;
   font-variant-numeric: tabular-nums; color: var(--series-1);
 }
-.breath-meta { font-size: 12.5px; color: var(--text-3); }
 
 @media (prefers-reduced-motion: reduce) {
-  .breath-halo, .breath-ring { transition: none; transform: scale(.85) !important; }
   .view { animation: none; }
 }
 
