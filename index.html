@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ja" data-theme="night">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Nocturne — 眠りと瞑想</title>
+<meta name="description" content="呼吸ガイド、睡眠サウンド、NSDR、睡眠ログ、体内リズム設計。インストール不要・完全オフラインで動く静的アプリ。">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0c0a08">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%230c0a08'/%3E%3Cpath d='M20.5 21.5A8 8 0 0 1 13 8.2a9 9 0 1 0 9.9 14.6 8 8 0 0 1-2.4-1.3z' fill='%23c98500'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="./styles/app.css">
+</head>
+<body>
+<a class="skip" href="#main">本文へスキップ</a>
+
+<header class="topbar">
+  <h1 class="brand"><span class="brand-mark" aria-hidden="true"></span>Nocturne</h1>
+  <div class="topbar-actions">
+    <button type="button" id="dimBtn" class="icon-btn" aria-pressed="false" title="画面をさらに暗くする">
+      <span aria-hidden="true">◐</span><span class="sr-only">減光モード</span>
+    </button>
+    <button type="button" id="stopAllBtn" class="icon-btn" title="音をすべて停止">
+      <span aria-hidden="true">◼</span><span class="sr-only">音をすべて停止</span>
+    </button>
+  </div>
+</header>
+
+<main id="main" tabindex="-1">
+  <section id="view-breathe" class="view" aria-labelledby="h-breathe"></section>
+  <section id="view-sounds" class="view" aria-labelledby="h-sounds" hidden></section>
+  <section id="view-nsdr" class="view" aria-labelledby="h-nsdr" hidden></section>
+  <section id="view-log" class="view" aria-labelledby="h-log" hidden></section>
+  <section id="view-rhythm" class="view" aria-labelledby="h-rhythm" hidden></section>
+</main>
+
+<nav class="tabbar" aria-label="メインナビゲーション">
+  <a href="#/breathe" data-tab="breathe"><span class="tab-ico" aria-hidden="true">◍</span>呼吸</a>
+  <a href="#/sounds"  data-tab="sounds"><span class="tab-ico" aria-hidden="true">≋</span>サウンド</a>
+  <a href="#/nsdr"    data-tab="nsdr"><span class="tab-ico" aria-hidden="true">☾</span>NSDR</a>
+  <a href="#/log"     data-tab="log"><span class="tab-ico" aria-hidden="true">▤</span>睡眠ログ</a>
+  <a href="#/rhythm"  data-tab="rhythm"><span class="tab-ico" aria-hidden="true">◔</span>リズム</a>
+</nav>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script type="module" src="./js/main.js"></script>
+<noscript><p class="noscript">このアプリはJavaScriptが必要です。</p></noscript>
+</body>
+</html>
