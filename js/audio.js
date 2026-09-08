@@ -394,23 +394,44 @@ export function setNarrationActive(active) {
 }
 
 /**
- * 呼吸フェーズの切り替わりを知らせる短い正弦波。減衰のみで立ち上がりを持たせ、
+ * 合図音の倍音構成。
+ *
+ * 当初は基音だけの正弦波だったが、264Hz のような低い音はスマートフォンの
+ * 内蔵スピーカーではほとんど再生されない（実測でエネルギーの約7割が
+ * 300Hz 未満に集中していた）。倍音を重ねて、小さなスピーカーが再生できる
+ * 帯域にも成分を持たせている。上の倍音ほど短く減衰させることで、
+ * ビープ音ではなく柔らかい鐘の響きになる。
+ */
+const PARTIALS = [
+  { ratio: 1, gain: 1, decay: 1 },      // 基音: ヘッドホンでの温かさを担う
+  { ratio: 2, gain: 0.45, decay: 0.7 },
+  { ratio: 4, gain: 0.18, decay: 0.45 }, // 小さなスピーカーでも届く帯域
+];
+
+/**
+ * 呼吸フェーズの切り替わりを知らせる短い音。減衰のみで立ち上がりを持たせ、
  * クリックノイズが出ないようにしている。
  */
 export function chime({ frequency = 396, duration = 0.9, volume = 0.18 } = {}) {
   if (!ensureContext()) return;
   const level = Math.max(FLOOR, volume * (narrationActive ? DUCK : 1));
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.type = "sine";
-  osc.frequency.value = frequency;
-
   const now = ctx.currentTime;
-  gain.gain.setValueAtTime(FLOOR, now);
-  gain.gain.exponentialRampToValueAtTime(level, now + 0.06);
-  gain.gain.exponentialRampToValueAtTime(FLOOR, now + duration);
 
-  osc.connect(gain).connect(masterGain);
-  osc.start(now);
-  osc.stop(now + duration + 0.05);
+  for (const partial of PARTIALS) {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = frequency * partial.ratio;
+
+    const peak = Math.max(FLOOR, level * partial.gain);
+    const end = duration * partial.decay;
+
+    gain.gain.setValueAtTime(FLOOR, now);
+    gain.gain.exponentialRampToValueAtTime(peak, now + 0.06);
+    gain.gain.exponentialRampToValueAtTime(FLOOR, now + end);
+
+    osc.connect(gain).connect(masterGain);
+    osc.start(now);
+    osc.stop(now + end + 0.05);
+  }
 }
