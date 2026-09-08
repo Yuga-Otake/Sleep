@@ -14,6 +14,7 @@ import { clamp } from "./util.js";
 
 const FLOOR = 0.0001;   // exponentialRamp に 0 は渡せないので使う下限値
 const FADE_SEC = 60;    // スリープタイマー終了前のフェードアウト長
+const DUCK = 0.3;       // ナレーション中に合図音へかける倍率
 
 let ctx = null;
 let masterGain = null;
@@ -382,12 +383,23 @@ function resetBus() {
 
 /* ---------- 合図音 ---------- */
 
+let narrationActive = false;
+
+/**
+ * NSDR のナレーションが喋っているかどうかを伝える。喋っている間は合図音を
+ * 控えめにして、言葉が埋もれないようにする（呼吸ガイドとの併走時に効く）。
+ */
+export function setNarrationActive(active) {
+  narrationActive = Boolean(active);
+}
+
 /**
  * 呼吸フェーズの切り替わりを知らせる短い正弦波。減衰のみで立ち上がりを持たせ、
  * クリックノイズが出ないようにしている。
  */
 export function chime({ frequency = 396, duration = 0.9, volume = 0.18 } = {}) {
   if (!ensureContext()) return;
+  const level = Math.max(FLOOR, volume * (narrationActive ? DUCK : 1));
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
   osc.type = "sine";
@@ -395,7 +407,7 @@ export function chime({ frequency = 396, duration = 0.9, volume = 0.18 } = {}) {
 
   const now = ctx.currentTime;
   gain.gain.setValueAtTime(FLOOR, now);
-  gain.gain.exponentialRampToValueAtTime(volume, now + 0.06);
+  gain.gain.exponentialRampToValueAtTime(level, now + 0.06);
   gain.gain.exponentialRampToValueAtTime(FLOOR, now + duration);
 
   osc.connect(gain).connect(masterGain);

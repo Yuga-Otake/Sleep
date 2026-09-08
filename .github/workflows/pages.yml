@@ -23,6 +23,7 @@ jobs:
         with:
           node-version: 22
       - run: node tests/sleep-math.test.mjs
+      - run: node tests/breath-math.test.mjs
 
   deploy:
     needs: test

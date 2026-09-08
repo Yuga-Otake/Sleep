@@ -386,3 +386,13 @@ footer.legal { max-width: var(--maxw); margin: 0 auto; padding: 0 var(--pad) 26p
   pointer-events: none;
 }
 .chart-ref-label { fill: var(--text-2); }
+
+/* 走っているセッションのタブに付く印 */
+.tabbar a { position: relative; }
+.tabbar a[data-running="true"]::after {
+  content: "";
+  position: absolute; top: 8px; left: 50%; margin-left: 9px;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--series-1);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--series-1) 60%, transparent);
+}

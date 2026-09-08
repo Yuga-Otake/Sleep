@@ -11,6 +11,8 @@
  * 毎フレーム DOM を作り直さず、生成済みノードの属性だけを書き換える。
  */
 
+import { cycleLength, fullnessAt as fullnessOf } from "./breath-math.js";
+
 const NS = "http://www.w3.org/2000/svg";
 
 const W = 340;
@@ -27,9 +29,6 @@ const MARKER_POOL = 8;   // フェーズ名ラベルの使い回し数
 
 const DOT_MIN = 4;       // 吐ききりのドット半径
 const DOT_MAX = 14;      // 吸いきりのドット半径
-
-/** 呼吸らしい加減速。始まりと終わりがゆっくりで、途中が速い。 */
-const ease = (p) => 0.5 - 0.5 * Math.cos(Math.PI * p);
 
 const node = (tag, attrs = {}) => {
   const element = document.createElementNS(NS, tag);
@@ -91,24 +90,7 @@ export function createBreathGraph({ reducedMotion = false } = {}) {
 
   /* ---------- 波形の計算 ---------- */
 
-  /** サイクル内の時刻 t における、そのフェーズと経過秒。 */
-  function phaseAt(t) {
-    let start = 0;
-    for (const phase of phases) {
-      if (t < start + phase.seconds) return { phase, local: t - start, start };
-      start += phase.seconds;
-    }
-    const last = phases[phases.length - 1];
-    return { phase: last, local: last.seconds, start: cycle - last.seconds };
-  }
-
-  /** 任意の時刻の膨らみ（0〜1）。サイクルをまたいでも連続する。 */
-  function fullnessAt(t) {
-    if (!cycle) return 0;
-    const inCycle = ((t % cycle) + cycle) % cycle;
-    const { phase, local } = phaseAt(inCycle);
-    return phase.from + (phase.to - phase.from) * ease(local / phase.seconds);
-  }
+  const fullnessAt = (t) => (cycle ? fullnessOf(phases, t) : 0);
 
   /** 秒の範囲を折れ線のパス文字列にする。 */
   function pathFor(fromSec, toSec, xOf) {
@@ -199,16 +181,10 @@ export function createBreathGraph({ reducedMotion = false } = {}) {
     /** パターンを差し替える。phases は {short, seconds, from, to} を持つ配列。 */
     setPattern(nextPhases) {
       phases = nextPhases;
-      cycle = phases.reduce((sum, phase) => sum + phase.seconds, 0);
+      cycle = cycleLength(phases);
       update(0);
     },
 
     update,
-
-    /** 現在時刻におけるフェーズ情報。カウントダウン表示に使う。 */
-    phaseInfo(t) {
-      const inCycle = ((Math.max(0, t) % cycle) + cycle) % cycle;
-      return phaseAt(inCycle);
-    },
   };
 }

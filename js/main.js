@@ -3,6 +3,8 @@
 import { el, toast } from "./util.js";
 import { load, save } from "./store.js";
 import { stopAllLayers, anyPlaying } from "./audio.js";
+import { breathSession } from "./breath-session.js";
+import { nsdrSession } from "./nsdr-session.js";
 
 import * as breathe from "./views/breathe.js";
 import * as sounds from "./views/sounds.js";
@@ -75,11 +77,34 @@ function setupDim() {
 
 function setupStopAll() {
   document.getElementById("stopAllBtn").addEventListener("click", () => {
-    const wasPlaying = anyPlaying();
+    const wasActive = anyPlaying() || breathSession.running || nsdrSession.running;
     stopAllLayers();
-    if ("speechSynthesis" in window) speechSynthesis.cancel();
-    toast(wasPlaying ? "停止しました" : "再生中の音はありません");
+    breathSession.stop();
+    nsdrSession.stop();
+    toast(wasActive ? "すべて停止しました" : "動いているものはありません");
   });
+}
+
+/**
+ * 走っているセッションのタブに印をつける。呼吸と NSDR は画面を離れても
+ * 続くので、どこかで動いていることが常に見えるようにしておく。
+ */
+function setupRunningMarks() {
+  const marks = {
+    breathe: () => breathSession.running,
+    nsdr: () => nsdrSession.running,
+    sounds: () => anyPlaying(),
+  };
+
+  const refresh = () => {
+    for (const [tab, isRunning] of Object.entries(marks)) {
+      const link = document.querySelector(`.tabbar a[data-tab="${tab}"]`);
+      if (link) link.dataset.running = String(isRunning());
+    }
+  };
+
+  refresh();
+  setInterval(refresh, 1000);
 }
 
 function addFooter() {
@@ -99,4 +124,5 @@ window.addEventListener("hashchange", () => show(routeName()));
 addFooter();
 setupDim();
 setupStopAll();
+setupRunningMarks();
 show(routeName());
