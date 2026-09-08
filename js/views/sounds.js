@@ -1,6 +1,6 @@
 /** 睡眠サウンド。合成音のレイヤーを重ね、スリープタイマーでフェードアウトさせる。 */
 
-import { el, formatClock, toast } from "../util.js";
+import { el, formatClock, toast, isIOS } from "../util.js";
 import {
   LAYER_SPECS, getLayer, ensureContext, isSupported,
   getMasterVolume, setMasterVolume, stopAllLayers,
@@ -209,6 +209,14 @@ export function render(root) {
     el("div", { class: "card" }, [
       el("h3", { text: "全体の音量" }),
       masterSlider,
+      // iPhone の消音スイッチは、内蔵スピーカーの音だけを黙らせる。
+      // イヤホンでは鳴るので原因に気づきにくく、必ず案内を出しておく。
+      isIOS() && el("p", { class: "hint" }, [
+        "スピーカーから音が出ないときは、本体側面の",
+        el("strong", { text: "消音スイッチ（マナーモード）" }),
+        "を確認してください。マナーモード中、iPhone はブラウザの音をスピーカーからは出しません",
+        "（イヤホンや Bluetooth では鳴ります）。",
+      ]),
       el("button", {
         class: "btn btn-ghost btn-sm", type: "button", style: "margin-top:8px",
         onclick: () => {

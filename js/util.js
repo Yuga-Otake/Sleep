@@ -85,6 +85,15 @@ export function toast(message) {
   toastTimer = setTimeout(() => { node.dataset.show = "false"; }, 2600);
 }
 
+/**
+ * iOS かどうか。iPadOS は MacIntel を名乗るのでタッチ点数で見分ける。
+ * 消音スイッチの案内を出すかどうかの判定にだけ使う。
+ */
+export function isIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent)
+    || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+
 /** セッション中の画面消灯を防ぐ。未対応ブラウザでは黙って何もしない。 */
 export function createWakeLock() {
   let sentinel = null;
