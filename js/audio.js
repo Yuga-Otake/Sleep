@@ -4,13 +4,15 @@
  * 音源ファイルを一切持たず、すべてブラウザ上で合成する。そのためリポジトリは
  * 数十 KB のまま、GitHub Pages にそのまま置ける。信号経路は
  *
- *   各レイヤー → layerGain → busGain(スリープタイマーのフェード) → masterGain → 出力
+ *   各レイヤー → layerGain → busGain(スリープタイマーのフェード)
+ *                            → breathGain(呼吸に合わせた揺らぎ) → masterGain → 出力
  *
- * で、呼吸ガイドの合図音だけは busGain を迂回して masterGain に直結する
- * (サウンドのフェードアウト中でも合図が消えないようにするため)。
+ * で、呼吸ガイドの合図音だけは busGain と breathGain を迂回して masterGain に
+ * 直結する (サウンドのフェードアウトや揺らぎの谷で合図が消えないようにするため)。
  */
 
 import { clamp } from "./util.js";
+import { cycleLength, fullnessAt } from "./breath-math.js";
 
 const FLOOR = 0.0001;   // exponentialRamp に 0 は渡せないので使う下限値
 const FADE_SEC = 60;    // スリープタイマー終了前のフェードアウト長
@@ -19,6 +21,7 @@ const DUCK = 0.3;       // ナレーション中に合図音へかける倍率
 let ctx = null;
 let masterGain = null;
 let busGain = null;
+let breathGain = null;
 let masterVolume = 0.7;
 
 const buffers = new Map();
@@ -33,9 +36,12 @@ export function ensureContext() {
     masterGain = ctx.createGain();
     masterGain.gain.value = masterVolume;
     masterGain.connect(ctx.destination);
+    breathGain = ctx.createGain();
+    breathGain.gain.value = 1;
+    breathGain.connect(masterGain);
     busGain = ctx.createGain();
     busGain.gain.value = 1;
-    busGain.connect(masterGain);
+    busGain.connect(breathGain);
   }
   if (ctx.state === "suspended") ctx.resume().catch(() => {});
   return ctx;
@@ -329,6 +335,7 @@ export function anyPlaying() {
 export function stopAllLayers() {
   for (const layer of layers.values()) layer.stop();
   cancelSleepTimer();
+  stopBreathModulation();
 }
 
 /* ---------- スリープタイマー ---------- */
@@ -379,6 +386,108 @@ function resetBus() {
   if (!busGain) return;
   busGain.gain.cancelScheduledValues(ctx.currentTime);
   busGain.gain.setValueAtTime(1, ctx.currentTime);
+}
+
+/* ---------- 呼吸に合わせた揺らぎ ---------- */
+
+/**
+ * 呼吸の波形を、そのままサウンドの音量に流し込む。吸うと音が満ち、吐くと引く。
+ *
+ * 毎フレーム JS から音量を書き換える作りにはしていない。requestAnimationFrame は
+ * ブラウザを背面に回すと止まるため、画面を見ていない間に音量が中途半端な値で
+ * 固まってしまう。そこで 1 呼吸ぶんの包絡を AudioBuffer に書き出してループ再生し、
+ * その信号を AudioParam に加算する。以降は音声スレッドだけで正確に回り続ける。
+ *
+ * breathGain.gain の内在値を (1 - depth) に置き、そこへ 0〜depth の信号を足すので、
+ * 実際の倍率は (1 - depth) 〜 1 の範囲を往復する。depth を 1 未満に保つ限り、
+ * 谷でも無音にはならない。
+ */
+
+const ENV_RATE = 8000;   // 包絡はゆっくり動くので音声レートは要らない
+
+let breathSource = null;
+let breathDepthGain = null;
+let breathDepth = 0.6;
+let breathPhases = null;
+
+function envelopeBuffer(phases) {
+  const cycle = cycleLength(phases);
+  const length = Math.max(1, Math.round(ENV_RATE * cycle));
+  const buffer = ctx.createBuffer(1, length, ENV_RATE);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < length; i++) data[i] = fullnessAt(phases, i / ENV_RATE);
+  return buffer;
+}
+
+function teardownBreathSource() {
+  if (!breathSource) return;
+  try { breathSource.stop(); } catch { /* 既に停止済み */ }
+  breathSource.disconnect();
+  breathDepthGain.disconnect();
+  breathSource = null;
+  breathDepthGain = null;
+}
+
+/**
+ * 揺らぎを始める。
+ * @param {object[]} phases    呼吸パターンのフェーズ列
+ * @param {number} offsetSec  呼吸のどこから始めるか（進行中のセッションに合わせる用）
+ */
+export function startBreathModulation(phases, offsetSec = 0) {
+  if (!ensureContext() || !phases?.length) return;
+  teardownBreathSource();
+  breathPhases = phases;
+
+  const cycle = cycleLength(phases);
+  breathSource = ctx.createBufferSource();
+  breathSource.buffer = envelopeBuffer(phases);
+  breathSource.loop = true;
+
+  breathDepthGain = ctx.createGain();
+  breathDepthGain.gain.value = breathDepth;
+  breathSource.connect(breathDepthGain).connect(breathGain.gain);
+
+  breathGain.gain.cancelScheduledValues(ctx.currentTime);
+  breathGain.gain.value = 1 - breathDepth;
+
+  const offset = ((offsetSec % cycle) + cycle) % cycle;
+  breathSource.start(ctx.currentTime, offset);
+}
+
+export function stopBreathModulation() {
+  if (!ctx || !breathSource) {
+    breathPhases = null;
+    return;
+  }
+  teardownBreathSource();
+  breathPhases = null;
+  // 信号が切れたので、内在値を 1 へ戻せばそのまま等倍に復帰する。
+  breathGain.gain.setTargetAtTime(1, ctx.currentTime, 0.25);
+}
+
+export function isBreathModulationOn() {
+  return Boolean(breathSource);
+}
+
+export function getBreathDepth() {
+  return breathDepth;
+}
+
+export function setBreathDepth(value) {
+  breathDepth = clamp(value, 0, 0.95);
+  if (!breathSource) return;
+  const now = ctx.currentTime;
+  breathDepthGain.gain.setTargetAtTime(breathDepth, now, 0.05);
+  breathGain.gain.setTargetAtTime(1 - breathDepth, now, 0.05);
+}
+
+/**
+ * パターンが変わったとき、または呼吸セッションが始まったときに位相を貼り直す。
+ * 揺らぎが止まっているときは何もしない。
+ */
+export function retuneBreathModulation(phases, offsetSec = 0) {
+  if (!breathSource) return;
+  startBreathModulation(phases, offsetSec);
 }
 
 /* ---------- 合図音 ---------- */

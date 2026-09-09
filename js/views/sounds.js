@@ -5,7 +5,10 @@ import {
   LAYER_SPECS, getLayer, ensureContext, isSupported,
   getMasterVolume, setMasterVolume, stopAllLayers,
   startSleepTimer, cancelSleepTimer, sleepTimerRemaining,
+  startBreathModulation, stopBreathModulation, isBreathModulationOn,
+  getBreathDepth, setBreathDepth,
 } from "../audio.js";
+import { breathSession } from "../breath-session.js";
 import { load, save } from "../store.js";
 
 const PREF_KEY = "sound-prefs";
@@ -20,8 +23,9 @@ const PRESETS = {
 };
 
 export function render(root) {
-  const prefs = load(PREF_KEY, { volume: getMasterVolume(), timer: 30, layers: {} });
+  const prefs = load(PREF_KEY, { volume: getMasterVolume(), timer: 30, layers: {}, breathDepth: 0.6 });
   setMasterVolume(prefs.volume ?? 0.7);
+  setBreathDepth(prefs.breathDepth ?? 0.6);
 
   if (!isSupported()) {
     root.replaceChildren(
@@ -39,6 +43,7 @@ export function render(root) {
   const controls = new Map();   // レイヤーID → 表示更新用の要素
 
   function persist() {
+    prefs.breathDepth = getBreathDepth();
     prefs.layers = {};
     for (const id of Object.keys(LAYER_SPECS)) {
       const layer = getLayer(id);
@@ -185,6 +190,63 @@ export function render(root) {
     onchange: () => { prefs.volume = getMasterVolume(); save(PREF_KEY, prefs); },
   });
 
+  /* ---------- 呼吸に合わせた揺らぎ ---------- */
+
+  const swayPattern = el("span", { class: "muted" });
+
+  const swayToggle = el("button", {
+    class: "switch", type: "button", role: "switch",
+    "aria-checked": String(isBreathModulationOn()),
+    "aria-label": "呼吸に合わせて音を揺らす",
+    onclick: () => {
+      if (isBreathModulationOn()) {
+        stopBreathModulation();
+      } else {
+        ensureContext();
+        // 呼吸セッションが動いていれば、その途中の位相から合わせる。
+        const elapsed = breathSession.running ? breathSession.snapshot().elapsed : 0;
+        startBreathModulation(breathSession.pattern().phases, elapsed);
+      }
+      paintSway();
+      persist();
+    },
+  });
+
+  const swayDepth = el("input", {
+    type: "range", min: "0.15", max: "0.9", step: "0.05", value: String(getBreathDepth()),
+    "aria-label": "揺らぎの深さ",
+    oninput: (e) => setBreathDepth(Number(e.target.value)),
+    onchange: () => { prefs.breathDepth = getBreathDepth(); save(PREF_KEY, prefs); },
+  });
+
+  const swayBody = el("div", { class: "layer-body" }, [
+    swayDepth,
+    el("p", { class: "muted", style: "margin-top:2px" },
+      ["深くすると満ち引きがはっきりします。谷でも無音にはなりません。"]),
+  ]);
+
+  const swayWrap = el("div", { class: "layer", "data-on": "false" }, [
+    el("div", { class: "layer-head" }, [
+      el("div", {}, [
+        el("div", { class: "layer-name", text: "呼吸に合わせて揺らす" }),
+        el("div", { class: "layer-desc" }, [
+          "吸うと音が満ち、吐くと引く。目を閉じたまま呼吸を合わせられます",
+        ]),
+      ]),
+      swayToggle,
+    ]),
+    swayBody,
+  ]);
+
+  function paintSway() {
+    const on = isBreathModulationOn();
+    swayWrap.dataset.on = String(on);
+    swayToggle.setAttribute("aria-checked", String(on));
+    const spec = breathSession.pattern();
+    swayPattern.textContent = `いまのパターン: ${spec.label}（${spec.tagline}）・呼吸画面で変更できます`;
+  }
+
+  paintSway();
   paintTimerChips();
 
   root.replaceChildren(
@@ -197,6 +259,10 @@ export function render(root) {
     el("div", { class: "card" }, [
       el("h3", { text: "ミキサー" }),
       mixer,
+    ]),
+    el("div", { class: "card" }, [
+      swayWrap,
+      el("p", { class: "muted", style: "margin-top:12px" }, [swayPattern]),
     ]),
     el("div", { class: "card" }, [
       el("div", { class: "row" }, [
@@ -221,6 +287,8 @@ export function render(root) {
         class: "btn btn-ghost btn-sm", type: "button", style: "margin-top:8px",
         onclick: () => {
           stopAllLayers();
+          stopBreathModulation();
+          paintSway();
           activeTimer = 0;
           paintTimerChips();
           for (const id of Object.keys(LAYER_SPECS)) {

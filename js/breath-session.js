@@ -7,7 +7,7 @@
  */
 
 import { createWakeLock } from "./util.js";
-import { chime, ensureContext } from "./audio.js";
+import { chime, ensureContext, retuneBreathModulation } from "./audio.js";
 import { load, save } from "./store.js";
 import { cycleLength, phaseAt, breathNumber } from "./breath-math.js";
 
@@ -146,6 +146,8 @@ export const breathSession = {
     if (state === "running") this.stop();
     prefs.pattern = id;
     this.savePrefs();
+    // サウンドの揺らぎも同じパターンで鳴らしているので貼り直す。
+    retuneBreathModulation(phases(), 0);
     emit();
   },
 
@@ -166,6 +168,8 @@ export const breathSession = {
     startedAt = performance.now();
     lastPhase = null;
     wakeLock.acquire();
+    // 揺らぎが鳴っているなら、視覚のドットと音の満ち引きを揃える。
+    retuneBreathModulation(phases(), 0);
     frame();
   },
 
